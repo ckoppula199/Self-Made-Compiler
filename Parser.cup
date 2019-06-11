@@ -1,0 +1,145 @@
+/*
+CITATIONS
+
+https://www.youtube.com/watch?v=eF9qWbuQLuw (5-part series, parts 1 & 2 used to gain further understanding and examples of parser)
+{
+  https://github.com/horeilly1101/jflex-to-cup/blob/master/example.cup
+  https://github.com/horeilly1101/jflex-to-cup/blob/master/example.jflex
+  https://github.com/moy/JFlex/blob/master/jflex/examples/cup/ycalc.cup
+} (used to view examples of lexer but mainly to see examples of how cup is used and grammar examples)
+http://people.cs.pitt.edu/~mock/cs1622/PA3/simple.cup (used as another cup example)
+https://www.skenz.it/compilers/classroom/practice3_6.pdf (examples of grammars)
+http://www.cs.princeton.edu/~appel/modern/java/CUP/manual.html (lots of example grammrs off which some of mine are based)
+http://pages.cs.wisc.edu/~fischer/cs536.s08/lectures/Lecture17.4up.pdf (helped with the if statement)
+http://www.cse.aucegypt.edu/~rafea/CSCE447/slides/Grammar.pdf (example grammars also helped with if statement)
+http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf (used rather heavily with examples for grammars and structure for grammars, especially for statements)
+*/
+
+import java_cup.runtime.*;
+
+parser code {:
+    public boolean syntaxErrors;
+    public void syntax_error(Symbol current_token) {
+        report_error(
+            "Syntax error at line " + (current_token.left+1) + ", column "
+            + current_token.right, null
+        );
+    }
+
+:};
+
+terminal        SEMICOLON, ASSIGN, EQ, PLUS, MINUS, MULTIPLY, DIVIDE, UPARROW, COLON, COMMA, DOT, LPAREN, RPAREN, LBRACE, RBRACE, LBRACKET, RBRACKET, LT, GT, LENGTH, LTEQ, GTEQ, AND, OR, NOT, CHARACTER, RATTYPE, FLOATTYPE, BOOLEAN, CHARTYPE, SEQUENCETYPE, SECURETYPE, MAIN, IN, READ, PRINT, RETURN, BREAK, CONCATONATION, TYPEDEFINITION, ALIAS, FUNCTIONDEFINITION, IF, FI, THEN, ELSE, LOOP, POOL, TOP, INTTYPE, BOOLTYPE, IDENTIFIER, NUMBER, STRING, SYNTAXERROR, NOTEQ;
+
+non terminal    program, blockOfCode, identifier, accessor, type, sequenceType, listOfExpressions,  expression, operator, compare, expressionOrNothing, manyDeclarations, returnType, parameters, declaration, assignment, multipleStatements, statement, ifStatement, returnStatement, break, function, functionCall, statementWithBreak, multipleStatementsWithBreak, sequenceValue, ifStatementWithBreak, blockOfCodeWithBreak;
+
+precedence left PLUS, MINUS, AND, OR, MULTIPLY, DIVIDE, CONCATONATION;
+precedence right IN, UPARROW;
+precedence nonassoc NOT, LT, LTEQ, GT, GTEQ, EQ, NOTEQ;
+
+
+program ::= manyDeclarations MAIN LBRACE blockOfCode RBRACE SEMICOLON manyDeclarations; //main can be anywhere in code
+
+blockOfCode ::= manyDeclarations multipleStatements;
+
+identifier ::= accessor DOT identifier //for caling user defined data types
+            | accessor
+            | accessor DOT LENGTH;
+
+accessor ::= IDENTIFIER
+             | IDENTIFIER LBRACKET expression RBRACKET                                      //list slicing
+             | IDENTIFIER LBRACKET expressionOrNothing COLON expressionOrNothing RBRACKET   //list slicing
+             | functionCall
+             | functionCall LBRACKET expression RBRACKET                                    //list slicing
+             | functionCall LBRACKET expressionOrNothing COLON expressionOrNothing RBRACKET; //list slicing
+
+type ::= SEQUENCETYPE LT sequenceType GT 
+        | CHARTYPE SECURETYPE 
+        | INTTYPE SECURETYPE 
+        | RATTYPE SECURETYPE 
+        | FLOATTYPE SECURETYPE 
+        | BOOLTYPE SECURETYPE 
+        | IDENTIFIER;
+
+sequenceType ::= type 
+        | TOP SECURETYPE; //list of multiple types
+
+listOfExpressions ::= expression | expression COMMA listOfExpressions;
+
+sequenceValue ::= LBRACKET listOfExpressions RBRACKET //lists
+           | LBRACKET RBRACKET  //empty list
+           | STRING;
+
+operator ::= PLUS | MINUS | MULTIPLY | DIVIDE | UPARROW;
+compare ::= AND 
+              | OR 
+              | EQ 
+              | LT 
+              | GT 
+              | LTEQ 
+              | GTEQ 
+              | NOTEQ;
+
+expressionOrNothing ::= expression |;
+
+manyDeclarations ::= |manyDeclarations declaration;
+
+declaration ::= IDENTIFIER COLON type SEMICOLON
+              | IDENTIFIER COLON type ASSIGN listOfExpressions SEMICOLON
+              | TYPEDEFINITION IDENTIFIER LBRACE parameters RBRACE SEMICOLON
+              | ALIAS type type SEMICOLON
+              | function;
+
+function ::= FUNCTIONDEFINITION IDENTIFIER LPAREN parameters RPAREN LBRACE blockOfCode RBRACE returnType SEMICOLON;
+
+multipleStatements ::= multipleStatements statement| statement;
+
+statement ::= LOOP blockOfCodeWithBreak POOL
+            | ifStatement
+            | assignment
+            | returnStatement
+            | READ identifier SEMICOLON
+            | PRINT expression SEMICOLON
+            | functionCall SEMICOLON;
+
+assignment ::= identifier ASSIGN listOfExpressions SEMICOLON;
+
+break ::= BREAK SEMICOLON | BREAK NUMBER SEMICOLON; //break out of certain number of loops
+
+returnStatement ::= RETURN SEMICOLON | RETURN expression SEMICOLON; //return or return value
+
+ifStatement ::= IF LPAREN expression RPAREN THEN blockOfCode ELSE blockOfCode FI | IF LPAREN expression RPAREN THEN blockOfCode FI;
+
+blockOfCodeWithBreak ::= manyDeclarations multipleStatementsWithBreak;
+
+multipleStatementsWithBreak ::= statementWithBreak multipleStatementsWithBreak | statementWithBreak;
+
+statementWithBreak ::= LOOP blockOfCodeWithBreak POOL
+            | ifStatementWithBreak
+            | assignment
+            | returnStatement
+            | READ identifier SEMICOLON
+            | PRINT expression SEMICOLON
+            | functionCall SEMICOLON
+            | break;
+
+expression ::= expression operator expression
+             | expression CONCATONATION expression
+             | expression compare expression
+             | expression IN expression
+             | NUMBER
+             | CHARACTER
+             | BOOLEAN
+             | MINUS expression //minus sign to check for negative numbers, not handled in the lexer
+             | NOT expression
+             | LPAREN expression RPAREN
+             | sequenceValue         
+             | identifier;
+
+returnType ::= COLON type |;
+
+ifStatementWithBreak ::= IF LPAREN expression RPAREN THEN blockOfCodeWithBreak FI
+               | IF LPAREN expression RPAREN THEN blockOfCodeWithBreak ELSE blockOfCodeWithBreak FI;
+
+parameters ::= | IDENTIFIER COLON type | IDENTIFIER COLON type COMMA parameters;
+
+functionCall ::= IDENTIFIER LPAREN listOfExpressions RPAREN;
